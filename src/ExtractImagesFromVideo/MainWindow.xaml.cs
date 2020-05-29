@@ -324,7 +324,12 @@ namespace ExtractImagesFromVideo
 
                 //https://github.com/ytdl-org/youtube-dl/blob/master/README.md#options
 
-                string args = string.Format("-o \"{0}\\%(title)s.%(ext)s\" {1}", _sessionFolders.VideoFolder, txtVideoURL.Text);
+                // Putting a number in front in case they download multiple videos.  It guarantees uniqueness and shows the order
+                // that they downloaded them in
+                int fileNumber = Directory.GetFiles(_sessionFolders.VideoFolder).Length;
+                fileNumber++;
+
+                string args = string.Format("-o \"{0}\\{1} - %(title)s.%(ext)s\" {2}", _sessionFolders.VideoFolder, fileNumber, txtVideoURL.Text);
 
                 Process.Start(txtYoutubeDLLocation.Text, args);
             }
@@ -332,6 +337,11 @@ namespace ExtractImagesFromVideo
             {
                 ShowErrorMessage(ex.Message);
             }
+        }
+
+        private void ExtractImages_Click(object sender, RoutedEventArgs e)
+        {
+
         }
 
         #endregion

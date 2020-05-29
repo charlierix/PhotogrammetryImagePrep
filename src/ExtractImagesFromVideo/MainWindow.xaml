@@ -95,8 +95,42 @@
 
                         <Button Content="Download" HorizontalAlignment="Right" Margin="0,24,0,0" Click="DownloadVideo_Click"/>
 
-                        <TextBlock x:Name="lblVideoFolder" Foreground="Gray"/>
-                        <TextBlock x:Name="lblVideoFile" Foreground="Gray"/>
+                        <TextBlock x:Name="lblVideoFolder" Foreground="Gray" Margin="0,8,0,0"/>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Extract Images -->
+                <Expander Header="Extract images from video" Margin="0,8,0,0">
+                    <StackPanel Margin="8">
+
+                        <!-- Video -->
+                        <Label Content="Video"/>
+                        <ComboBox x:Name="cboVideoToExtractFrom"/>
+
+                        <Grid Margin="0,8,0,0">
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="8"/>
+                                <ColumnDefinition Width="3*"/>
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="auto"/>
+                                <RowDefinition Height="auto"/>
+                            </Grid.RowDefinitions>
+
+                            <!-- Extract Frames -->
+                            <Label Grid.Column="0" Grid.Row="0" Content="Every X Frames"/>
+                            <TextBox Grid.Column="0" Grid.Row="1" x:Name="txtExtractEveryXFrames"/>
+
+                            <!-- Time Windows -->
+                            <Label Grid.Column="2" Grid.Row="0" Content="Time Windows [optional]"/>
+                            <Label Grid.Column="2" Grid.Row="0" Content="example-- 3:14 3:35, 6:05 7:42" FontSize="10" Foreground="#808080" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                            <TextBox Grid.Column="2" Grid.Row="1" x:Name="txtTimeWindows"/>
+                        </Grid>
+
+                        <Button Content="Extract" HorizontalAlignment="Right" Margin="0,24,0,0" Click="ExtractImages_Click"/>
+
+
                     </StackPanel>
                 </Expander>
             </StackPanel>
