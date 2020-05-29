@@ -21,6 +21,8 @@ using System.Windows.Threading;
 
 namespace ExtractImagesFromVideo
 {
+    //TODO: Don't use app.config serialize an object and store in appdata
+
     public partial class MainWindow : Window
     {
         #region Declaration Section
@@ -81,7 +83,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
 
@@ -98,7 +100,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
 
@@ -110,7 +112,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
         private void HelpSessionFolder_Click(object sender, RoutedEventArgs e)
@@ -121,7 +123,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
         private void HelpCreateFolders_Click(object sender, RoutedEventArgs e)
@@ -132,7 +134,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
         private void Hyperlink_DownloadYoutubeDL(object sender, RequestNavigateEventArgs e)
@@ -147,7 +149,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
         private void VideoURLHelp_Click(object sender, RoutedEventArgs e)
@@ -158,7 +160,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
 
@@ -183,12 +185,12 @@ namespace ExtractImagesFromVideo
 
                 if (filenames == null || filenames.Length == 0)
                 {
-                    MessageBox.Show("No folders selected", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ShowErrorMessage("No folders selected");
                     return;
                 }
                 else if (filenames.Length > 1)
                 {
-                    MessageBox.Show("Only one folder allowed", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ShowErrorMessage("Only one folder allowed");
                     return;
                 }
 
@@ -196,7 +198,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
 
@@ -208,7 +210,18 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+        private void cboSession_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                RefreshFolderNames(true);
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
             }
         }
 
@@ -220,7 +233,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
 
@@ -245,12 +258,12 @@ namespace ExtractImagesFromVideo
 
                 if (filenames == null || filenames.Length == 0)
                 {
-                    MessageBox.Show("No files selected", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ShowErrorMessage("No files selected");
                     return;
                 }
                 else if (filenames.Length > 1)
                 {
-                    MessageBox.Show("Only one file allowed", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    ShowErrorMessage("Only one file allowed");
                     return;
                 }
 
@@ -258,7 +271,7 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
             }
         }
 
@@ -277,7 +290,47 @@ namespace ExtractImagesFromVideo
             }
             catch (Exception ex)
             {
-                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+
+        private void DownloadVideo_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                if (!_sessionFolders.IsValid)
+                {
+                    ShowErrorMessage("Need to specify folder first");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(txtYoutubeDLLocation.Text))
+                {
+                    ShowErrorMessage("Need to point to youtube-dl.exe first");
+                    return;
+                }
+
+                if (string.IsNullOrWhiteSpace(txtVideoURL.Text))
+                {
+                    ShowErrorMessage("Need to specify url first");
+                    return;
+                }
+
+                EnsureFoldersExist();
+                if (!_sessionFolders.DoFoldersExist)
+                {
+                    return;
+                }
+
+                //https://github.com/ytdl-org/youtube-dl/blob/master/README.md#options
+
+                string args = string.Format("-o \"{0}\\%(title)s.%(ext)s\" {1}", _sessionFolders.VideoFolder, txtVideoURL.Text);
+
+                Process.Start(txtYoutubeDLLocation.Text, args);
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.Message);
             }
         }
 
@@ -297,7 +350,7 @@ namespace ExtractImagesFromVideo
                 ShowErrorMessage(_sessionFolders.FolderExistenceErrorMessage);
         }
 
-        private void RefreshFolderNames()
+        private void RefreshFolderNames(bool isCalledFromSessionCombo = false)
         {
             _sessionFolders.Reset(txtBaseFolder.Text, cboSession.Text);
 
@@ -310,6 +363,18 @@ namespace ExtractImagesFromVideo
                 txtBaseFolder.Effect = _errorEffect;
             else if (!_sessionFolders.IsValid_Session)
                 cboSession.Effect = _errorEffect;
+
+            if (!isCalledFromSessionCombo)      //playing with the list while they type causes deadlock
+            {
+                cboSession.Items.Clear();
+                if (_sessionFolders.IsValid_Base && Directory.Exists(_sessionFolders.BaseFolder))
+                {
+                    foreach (string childFolder in Directory.GetDirectories(_sessionFolders.BaseFolder).OrderBy(o => o))
+                    {
+                        cboSession.Items.Add(System.IO.Path.GetFileName(childFolder));      // only want the portion after the last \
+                    }
+                }
+            }
         }
 
         private static string GetUniqueBaseFolder()

@@ -10,7 +10,11 @@ namespace ExtractImagesFromVideo
     /// </summary>
     public class SessionFolders
     {
-        private const string FOLDER_VIDEO = "Video";
+        private const string FOLDER_VIDEO = "1 - Video";
+        // 2 - Images
+        // 3 - Final Images?
+        // 4 - Meshroom
+        // 5 - Post Meshroom (blender, other smoothing apps)
 
         //TODO: Escape the characters
         public void Reset(string baseFolder, string session)

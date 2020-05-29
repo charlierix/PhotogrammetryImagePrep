@@ -57,7 +57,7 @@
                                 <Hyperlink Click="HelpSessionFolder_Click">?</Hyperlink>
                             </TextBlock>
                         </StackPanel>
-                        <ComboBox x:Name="cboSession" IsEditable="True"/>
+                        <ComboBox x:Name="cboSession" IsEditable="True" TextBoxBase.TextChanged="cboSession_TextChanged"/>
 
                         <!-- Create Folder Button -->
                         <TextBlock x:Name="lblCreateFolders" Text="Folders will be created automatically in the sections below, this button is just an option to create them now.  This is useful if the video comes from another source" Style="{StaticResource helpTextBlock}"/>
@@ -91,9 +91,9 @@
                                 <Hyperlink Click="VideoURLHelp_Click">?</Hyperlink>
                             </TextBlock>
                         </StackPanel>
-
-
                         <TextBox x:Name="txtVideoURL"/>
+
+                        <Button Content="Download" HorizontalAlignment="Right" Margin="0,24,0,0" Click="DownloadVideo_Click"/>
 
                         <TextBlock x:Name="lblVideoFolder" Foreground="Gray"/>
                         <TextBlock x:Name="lblVideoFile" Foreground="Gray"/>
