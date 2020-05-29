@@ -6,4 +6,8 @@
     <UseWPF>true</UseWPF>
   </PropertyGroup>
 
+  <Target Name="PostBuild" AfterTargets="PostBuildEvent">
+    <Exec Command="del &quot;$(SolutionDir)..\bin\*.json&quot;&#xD;&#xA;del &quot;$(SolutionDir)..\bin\*.config&quot;&#xD;&#xA;del &quot;$(SolutionDir)..\bin\*.pdb&quot;&#xD;&#xA;del &quot;$(SolutionDir)..\bin\*.dll&quot;&#xD;&#xA;del &quot;$(SolutionDir)..\bin\*.exe&quot;&#xD;&#xA;copy /Y &quot;$(TargetDir)*&quot; &quot;$(SolutionDir)..\bin\&quot;" />
+  </Target>
+
 </Project>
