@@ -21,14 +21,9 @@ using System.Windows.Threading;
 
 namespace ExtractImagesFromVideo
 {
-    //TODO: Don't use app.config serialize an object and store in appdata
-
     public partial class MainWindow : Window
     {
         #region Declaration Section
-
-        private const string CONFIG_BASEFOLDER = "BaseFolder";
-        private const string CONFIG_YOUTUBEDL = "YoutubeDL";
 
         private readonly Effect _errorEffect = new DropShadowEffect()
         {
@@ -43,6 +38,8 @@ namespace ExtractImagesFromVideo
         private readonly DispatcherTimer _hideHelpTimer;
 
         private readonly SessionFolders _sessionFolders = new SessionFolders();
+
+        private ExtractorSettings _settings = null;
 
         #endregion
 
@@ -67,15 +64,17 @@ namespace ExtractImagesFromVideo
         {
             try
             {
-                string baseFolder = ConfigurationManager.AppSettings[CONFIG_BASEFOLDER];
-                if (string.IsNullOrWhiteSpace(baseFolder))
+                _settings = ExtractorSettings.GetSettingsFromDrive() ??
+                    new ExtractorSettings();
+
+                if (string.IsNullOrWhiteSpace(_settings.BaseFolder))
                 {
-                    baseFolder = GetUniqueBaseFolder();
+                    _settings.BaseFolder = GetUniqueBaseFolder();
                 }
 
-                txtBaseFolder.Text = baseFolder;
+                txtBaseFolder.Text = _settings.BaseFolder;
 
-                txtYoutubeDLLocation.Text = ConfigurationManager.AppSettings[CONFIG_YOUTUBEDL] ?? "";
+                txtYoutubeDLLocation.Text = _settings.YoutubeDL ?? "";
 
                 //NOTE: the text change event listeners may have fired above, but not if going from "" to ""
                 RefreshFolderNames();
@@ -229,7 +228,7 @@ namespace ExtractImagesFromVideo
         {
             try
             {
-                EnsureFoldersExist();
+                EnsureFoldersExist_SaveSettings();
             }
             catch (Exception ex)
             {
@@ -287,6 +286,8 @@ namespace ExtractImagesFromVideo
                 {
                     txtYoutubeDLLocation.Effect = _errorEffect;
                 }
+
+                _settings.YoutubeDL = txtYoutubeDLLocation.Text;
             }
             catch (Exception ex)
             {
@@ -316,7 +317,7 @@ namespace ExtractImagesFromVideo
                     return;
                 }
 
-                EnsureFoldersExist();
+                EnsureFoldersExist_SaveSettings();
                 if (!_sessionFolders.DoFoldersExist)
                 {
                     return;
@@ -348,16 +349,21 @@ namespace ExtractImagesFromVideo
 
         #region Private Methods
 
-        private void EnsureFoldersExist()
+        private void EnsureFoldersExist_SaveSettings()
         {
             ShowErrorMessage();
 
             _sessionFolders.EnsureFoldersExist();
 
             if (_sessionFolders.DoFoldersExist)
-                ConfigurationManager.AppSettings[CONFIG_BASEFOLDER] = _sessionFolders.BaseFolder;
+            {
+                _settings.BaseFolder = _sessionFolders.BaseFolder;
+                ExtractorSettings.SaveSettingsToDrive(_settings);
+            }
             else
+            {
                 ShowErrorMessage(_sessionFolders.FolderExistenceErrorMessage);
+            }
         }
 
         private void RefreshFolderNames(bool isCalledFromSessionCombo = false)
