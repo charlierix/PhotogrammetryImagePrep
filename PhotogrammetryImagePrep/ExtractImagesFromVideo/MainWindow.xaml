@@ -1,0 +1,107 @@
+﻿<Window x:Class="ExtractImagesFromVideo.MainWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+        xmlns:local="clr-namespace:ExtractImagesFromVideo"
+        mc:Ignorable="d"
+        Title="Extract Images From Video" ResizeMode="CanResizeWithGrip" Width="600" Height="800" Loaded="Window_Loaded">
+    <Window.Resources>
+        <Style TargetType="Button">
+            <Setter Property="Padding" Value="4,1"/>
+        </Style>
+
+        <Style TargetType="TextBox">
+            <Setter Property="MinHeight" Value="22"/>
+        </Style>
+
+        <Style TargetType="ComboBox">
+            <Setter Property="MinHeight" Value="22"/>
+        </Style>
+
+        <Style x:Key="helpTextBlock" TargetType="TextBlock">
+            <Setter Property="Visibility" Value="Collapsed"/>
+            <Setter Property="Margin" Value="24"/>
+            <Setter Property="FontSize" Value="14"/>
+            <Setter Property="TextWrapping" Value="Wrap"/>
+            <Setter Property="Foreground" Value="#709070"/>
+        </Style>
+    </Window.Resources>
+
+    <Grid Margin="12">
+        <Grid.RowDefinitions>
+            <RowDefinition Height="1*"/>
+            <RowDefinition Height="auto"/>
+        </Grid.RowDefinitions>
+
+        <ScrollViewer Grid.Row="0" HorizontalScrollBarVisibility="Disabled" VerticalScrollBarVisibility="Auto">
+            <StackPanel>
+                <!-- Session -->
+                <Expander IsExpanded="True" Header="Session">
+                    <StackPanel Margin="8">
+                        <!-- Base Folder -->
+                        <TextBlock x:Name="lblBaseFolderHelp" Text="This is the folder where all the subfolders and files will be stored" Style="{StaticResource helpTextBlock}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="Base Folder"/>
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Click="HelpBaseFolder_Click">?</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                        <TextBox x:Name="txtBaseFolder" AllowDrop="True" PreviewDragEnter="txtBaseFolder_PreviewDragEnter" PreviewDragOver="txtBaseFolder_PreviewDragEnter" Drop="txtBaseFolder_Drop" TextChanged="txtBaseFolder_TextChanged"/>
+
+                        <!-- Session Folder -->
+                        <TextBlock x:Name="lblSessionFolderHelp" Text="This is a child folder of Base Folder.  Each time you want to gather images for a new 3D object, create a new session so that each object gets its own set of files" Style="{StaticResource helpTextBlock}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Label Content="Session Name"/>
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Click="HelpSessionFolder_Click">?</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                        <ComboBox x:Name="cboSession" IsEditable="True"/>
+
+                        <!-- Create Folder Button -->
+                        <TextBlock x:Name="lblCreateFolders" Text="Folders will be created automatically in the sections below, this button is just an option to create them now.  This is useful if the video comes from another source" Style="{StaticResource helpTextBlock}"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
+                            <TextBlock VerticalAlignment="Center" Margin="0,0,8,0">
+                                <Hyperlink Click="HelpCreateFolders_Click">?</Hyperlink>
+                            </TextBlock>
+                            <Button Content="Create Folders" Click="CreateFolders_Click"/>
+                        </StackPanel>
+                    </StackPanel>
+                </Expander>
+
+                <!-- Video -->
+                <Expander Header="Download Video" Margin="0,8,0,0">
+                    <StackPanel Margin="8">
+                        <!-- Youtube-dl Location -->
+                        <TextBlock x:Name="lblYoutubeDLHelp" Text="In order to download youtube videos, you first need to download a small console app.  Download the executable and store it someplace convenient (like c:\downloads), then drag that executable onto the textbox (or paste its location into the textbox)" Style="{StaticResource helpTextBlock}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="youtube-dl.exe (full path\filename)"/>
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink NavigateUri="http://www.computerhope.com/issues/ch001724.htm" RequestNavigate="Hyperlink_DownloadYoutubeDL">?</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                        <TextBox x:Name="txtYoutubeDLLocation" AllowDrop="True" PreviewDragEnter="txtYoutubeDLLocation_PreviewDragEnter" PreviewDragOver="txtYoutubeDLLocation_PreviewDragEnter" Drop="txtYoutubeDLLocation_Drop" TextChanged="txtYoutubeDLLocation_TextChanged"/>
+
+                        <!-- Video URL -->
+                        <TextBlock x:Name="lblVideoURLHelp" Style="{StaticResource helpTextBlock}">"This is the video to download.  Try to find a video where they walk around a static object, like a product review:<LineBreak/><LineBreak/>https://www.youtube.com/watch?v=aPPScO7jknU"</TextBlock>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Label Content="Video URL"/>
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Click="VideoURLHelp_Click">?</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+
+
+                        <TextBox x:Name="txtVideoURL"/>
+
+                        <TextBlock x:Name="lblVideoFolder" Foreground="Gray"/>
+                        <TextBlock x:Name="lblVideoFile" Foreground="Gray"/>
+                    </StackPanel>
+                </Expander>
+            </StackPanel>
+        </ScrollViewer>
+
+        <TextBox Grid.Row="1" Visibility="Collapsed" x:Name="txtErrorMessage" TextWrapping="Wrap" Background="{x:Null}" BorderBrush="{x:Null}" Foreground="#FF551E1E" Margin="0,8,0,0"/>
+    </Grid>
+</Window>

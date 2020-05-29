@@ -1,0 +1,426 @@
+﻿using System;
+using System.Collections.Generic;
+using System.Configuration;
+using System.Diagnostics;
+using System.IO;
+using System.Linq;
+using System.Runtime.InteropServices;
+using System.Text;
+using System.Threading.Tasks;
+using System.Windows;
+using System.Windows.Controls;
+using System.Windows.Data;
+using System.Windows.Documents;
+using System.Windows.Input;
+using System.Windows.Media;
+using System.Windows.Media.Effects;
+using System.Windows.Media.Imaging;
+using System.Windows.Navigation;
+using System.Windows.Shapes;
+using System.Windows.Threading;
+
+namespace ExtractImagesFromVideo
+{
+    public partial class MainWindow : Window
+    {
+        #region Declaration Section
+
+        private const string CONFIG_BASEFOLDER = "BaseFolder";
+        private const string CONFIG_YOUTUBEDL = "YoutubeDL";
+
+        private readonly Effect _errorEffect = new DropShadowEffect()
+        {
+            Color = ColorFromHex("DD2020"),
+            Direction = 0,
+            ShadowDepth = 0,
+            BlurRadius = 8,
+            Opacity = .7,
+        };
+
+        private readonly List<UIElement> _helpMessages = new List<UIElement>();
+        private readonly DispatcherTimer _hideHelpTimer;
+
+        private readonly SessionFolders _sessionFolders = new SessionFolders();
+
+        #endregion
+
+        #region Constructor
+
+        public MainWindow()
+        {
+            InitializeComponent();
+
+            Background = SystemColors.ControlBrush;
+
+            _hideHelpTimer = new DispatcherTimer();
+            _hideHelpTimer.Interval = TimeSpan.FromMinutes(3);
+            _hideHelpTimer.Tick += HideHelpTimer_Tick;
+        }
+
+        #endregion
+
+        #region Event Listeners
+
+        private void Window_Loaded(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                string baseFolder = ConfigurationManager.AppSettings[CONFIG_BASEFOLDER];
+                if (string.IsNullOrWhiteSpace(baseFolder))
+                {
+                    baseFolder = GetUniqueBaseFolder();
+                }
+
+                txtBaseFolder.Text = baseFolder;
+
+                txtYoutubeDLLocation.Text = ConfigurationManager.AppSettings[CONFIG_YOUTUBEDL] ?? "";
+
+                //NOTE: the text change event listeners may have fired above, but not if going from "" to ""
+                RefreshFolderNames();
+                txtYoutubeDLLocation_TextChanged(this, null);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void HideHelpTimer_Tick(object sender, EventArgs e)
+        {
+            try
+            {
+                _hideHelpTimer.Stop();
+
+                foreach (UIElement element in _helpMessages)
+                    element.Visibility = Visibility.Collapsed;
+
+                _helpMessages.Clear();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void HelpBaseFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblBaseFolderHelp);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        private void HelpSessionFolder_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblSessionFolderHelp);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        private void HelpCreateFolders_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblCreateFolders);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        private void Hyperlink_DownloadYoutubeDL(object sender, RequestNavigateEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblYoutubeDLHelp);
+
+                OpenURL(e.Uri.AbsoluteUri);
+
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+        private void VideoURLHelp_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblVideoURLHelp);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void txtBaseFolder_PreviewDragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+
+            e.Handled = true;
+        }
+        private void txtBaseFolder_Drop(object sender, DragEventArgs e)
+        {
+            try
+            {
+                string[] filenames = e.Data.GetData(DataFormats.FileDrop) as string[];
+
+                if (filenames == null || filenames.Length == 0)
+                {
+                    MessageBox.Show("No folders selected", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                else if (filenames.Length > 1)
+                {
+                    MessageBox.Show("Only one folder allowed", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                txtBaseFolder.Text = filenames[0];
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void txtBaseFolder_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                RefreshFolderNames();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void CreateFolders_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                EnsureFoldersExist();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void txtYoutubeDLLocation_PreviewDragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+
+            e.Handled = true;
+        }
+        private void txtYoutubeDLLocation_Drop(object sender, DragEventArgs e)
+        {
+            try
+            {
+                string[] filenames = e.Data.GetData(DataFormats.FileDrop) as string[];
+
+                if (filenames == null || filenames.Length == 0)
+                {
+                    MessageBox.Show("No files selected", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+                else if (filenames.Length > 1)
+                {
+                    MessageBox.Show("Only one file allowed", Title, MessageBoxButton.OK, MessageBoxImage.Warning);
+                    return;
+                }
+
+                txtYoutubeDLLocation.Text = filenames[0];
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        private void txtYoutubeDLLocation_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                if (File.Exists(txtYoutubeDLLocation.Text))
+                {
+                    txtYoutubeDLLocation.Effect = null;
+                }
+                else
+                {
+                    txtYoutubeDLLocation.Effect = _errorEffect;
+                }
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show(ex.ToString(), Title, MessageBoxButton.OK, MessageBoxImage.Error);
+            }
+        }
+
+        #endregion
+
+        #region Private Methods
+
+        private void EnsureFoldersExist()
+        {
+            ShowErrorMessage();
+
+            _sessionFolders.EnsureFoldersExist();
+
+            if (_sessionFolders.DoFoldersExist)
+                ConfigurationManager.AppSettings[CONFIG_BASEFOLDER] = _sessionFolders.BaseFolder;
+            else
+                ShowErrorMessage(_sessionFolders.FolderExistenceErrorMessage);
+        }
+
+        private void RefreshFolderNames()
+        {
+            _sessionFolders.Reset(txtBaseFolder.Text, cboSession.Text);
+
+            lblVideoFolder.Text = _sessionFolders.VideoFolder;
+
+            cboSession.Effect = null;
+            txtBaseFolder.Effect = null;
+
+            if (!_sessionFolders.IsValid_Base)
+                txtBaseFolder.Effect = _errorEffect;
+            else if (!_sessionFolders.IsValid_Session)
+                cboSession.Effect = _errorEffect;
+        }
+
+        private static string GetUniqueBaseFolder()
+        {
+            string desktop = Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+
+            for (int cntr = 0; cntr < 10000; cntr++)
+            {
+                string retVal = System.IO.Path.Combine(desktop, string.Format("Photogrammetry Inputs{0}", cntr == 0 ? "" : "_" + cntr.ToString()));
+
+                if (!Directory.Exists(retVal))
+                {
+                    return retVal;
+                }
+            }
+
+            return "";
+        }
+
+        private void OpenURL(string url)
+        {
+            // Got this here:
+            //https://brockallen.com/2016/09/24/process-start-for-urls-on-net-core/
+
+            try
+            {
+                Process.Start(url);
+            }
+            catch
+            {
+                try
+                {
+                    // hack because of this: https://github.com/dotnet/corefx/issues/10361
+                    if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
+                    {
+                        url = url.Replace("&", "^&");
+                        Process.Start(new ProcessStartInfo("cmd", $"/c start {url}") { CreateNoWindow = true });
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.Linux))
+                    {
+                        Process.Start("xdg-open", url);
+                    }
+                    else if (RuntimeInformation.IsOSPlatform(OSPlatform.OSX))
+                    {
+                        Process.Start("open", url);
+                    }
+                    else
+                    {
+                        throw;
+                    }
+                }
+                catch
+                {
+                    ShowErrorMessage($"Couldn't open url:\r\n{url}");
+                }
+            }
+        }
+
+        private void ShowHelpMessage(UIElement helpLabel)
+        {
+            helpLabel.Visibility = Visibility.Visible;
+
+            _helpMessages.Add(helpLabel);
+
+            _hideHelpTimer.Stop();
+            _hideHelpTimer.Start();
+        }
+        private void ShowErrorMessage(string message = null)
+        {
+            if (string.IsNullOrWhiteSpace(message))
+            {
+                txtErrorMessage.Text = "";
+                txtErrorMessage.Visibility = Visibility.Collapsed;
+            }
+            else
+            {
+                txtErrorMessage.Text = message;
+                txtErrorMessage.Visibility = Visibility.Visible;
+            }
+        }
+
+        #endregion
+        #region Private Methods - from party people
+
+        /// <summary>
+        /// This is just a wrapper to the color converter (why can't they have a method off the color class with all
+        /// the others?)
+        /// </summary>
+        private static Color ColorFromHex(string hexValue)
+        {
+            string final = hexValue;
+
+            if (!final.StartsWith("#"))
+            {
+                final = "#" + final;
+            }
+
+            if (final.Length == 4)      // compressed format, no alpha
+            {
+                // #08F -> #0088FF
+                final = new string(new[] { '#', final[1], final[1], final[2], final[2], final[3], final[3] });
+            }
+            else if (final.Length == 5)     // compressed format, has alpha
+            {
+                // #8A4F -> #88AA44FF
+                final = new string(new[] { '#', final[1], final[1], final[2], final[2], final[3], final[3], final[4], final[4] });
+            }
+
+            return (Color)ColorConverter.ConvertFromString(final);
+        }
+
+        #endregion
+    }
+}
