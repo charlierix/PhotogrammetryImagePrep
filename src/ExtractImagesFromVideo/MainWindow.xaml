@@ -5,7 +5,7 @@
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
         xmlns:local="clr-namespace:ExtractImagesFromVideo"
         mc:Ignorable="d"
-        Title="Extract Images From Video" ResizeMode="CanResizeWithGrip" Width="600" Height="800" Loaded="Window_Loaded">
+        Title="Extract Images From Video" ResizeMode="CanResizeWithGrip" Width="550" Height="700" Loaded="Window_Loaded">
     <Window.Resources>
         <Style TargetType="Button">
             <Setter Property="Padding" Value="4,1"/>
@@ -21,11 +21,17 @@
 
         <Style x:Key="helpTextBlock" TargetType="TextBlock">
             <Setter Property="Visibility" Value="Collapsed"/>
-            <Setter Property="Margin" Value="24"/>
+            <Setter Property="Margin" Value="24,24,24,0"/>
             <Setter Property="FontSize" Value="14"/>
             <Setter Property="TextWrapping" Value="Wrap"/>
             <Setter Property="Foreground" Value="#709070"/>
         </Style>
+
+        <Style x:Key="noteLabel" TargetType="Label">
+            <Setter Property="FontSize" Value="10"/>
+            <Setter Property="Foreground" Value="#808080"/>
+        </Style>
+
     </Window.Resources>
 
     <Grid Margin="12">
@@ -84,32 +90,59 @@
                         <TextBox x:Name="txtYoutubeDLLocation" AllowDrop="True" PreviewDragEnter="txtYoutubeDLLocation_PreviewDragEnter" PreviewDragOver="txtYoutubeDLLocation_PreviewDragEnter" Drop="txtYoutubeDLLocation_Drop" TextChanged="txtYoutubeDLLocation_TextChanged"/>
 
                         <!-- Video URL -->
-                        <TextBlock x:Name="lblVideoURLHelp" Style="{StaticResource helpTextBlock}">"This is the video to download.  Try to find a video where they walk around a static object, like a product review:<LineBreak/><LineBreak/>https://www.youtube.com/watch?v=aPPScO7jknU"</TextBlock>
+                        <TextBlock x:Name="lblVideoURLHelp" Style="{StaticResource helpTextBlock}">"This is the video to download.  Try to find a video where they walk around a static object, like a product review:<LineBreak/><LineBreak/>https://www.youtube.com/watch?v=aPPScO7jknU</TextBlock>
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
                             <Label Content="Video URL"/>
                             <TextBlock VerticalAlignment="Center">
                                 <Hyperlink Click="VideoURLHelp_Click">?</Hyperlink>
                             </TextBlock>
                         </StackPanel>
-                        <TextBox x:Name="txtVideoURL"/>
+                        <TextBox x:Name="txtVideoURL" TextChanged="txtVideoURL_TextChanged"/>
 
-                        <Button Content="Download" HorizontalAlignment="Right" Margin="0,24,0,0" Click="DownloadVideo_Click"/>
+                        <!-- Download Button -->
+                        <TextBlock x:Name="lblDownloadVideoHelp" Text="This will download the video.  Note that it's ok to download multiple videos, each time a video is downloaded, it will be prefixed with a counter" Style="{StaticResource helpTextBlock}"/>
+                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
+                            <TextBlock VerticalAlignment="Center" Margin="0,0,8,0">
+                                <Hyperlink Click="DownloadVideoHelp_Click">?</Hyperlink>
+                            </TextBlock>
+                            <Button Content="Download" Click="DownloadVideo_Click"/>
+                        </StackPanel>
 
                         <TextBlock x:Name="lblVideoFolder" Foreground="Gray" Margin="0,8,0,0"/>
                     </StackPanel>
                 </Expander>
 
                 <!-- Extract Images -->
-                <Expander Header="Extract images from video" Margin="0,8,0,0">
+                <Expander IsExpanded="True" Header="Extract images from video" Margin="0,8,0,0">
                     <StackPanel Margin="8">
-
+                        <!-- VLC Location -->
+                        <TextBlock x:Name="lblVLCHelp" Text="VLC media player has a mode that can grab images from a video every X frames.  Download and install the player (be careful, it tries to associate all file types to it), then drag that executable onto the textbox (or paste its location into the textbox)" Style="{StaticResource helpTextBlock}"/>
+                        <StackPanel Orientation="Horizontal">
+                            <Label Content="vlc.exe (full path\filename)"/>
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink NavigateUri="https://www.videolan.org/vlc/index.html" RequestNavigate="Hyperlink_DownloadVLC">?</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                        <TextBox x:Name="txtVLCLocation" AllowDrop="True" PreviewDragEnter="txtVLCLocation_PreviewDragEnter" PreviewDragOver="txtVLCLocation_PreviewDragEnter" Drop="txtVLCLocation_Drop" TextChanged="txtVLCLocation_TextChanged"/>
+                        
                         <!-- Video -->
-                        <Label Content="Video"/>
-                        <ComboBox x:Name="cboVideoToExtractFrom"/>
+                        <TextBlock x:Name="lblVideoToExtractFromHelp" Text="This is the video to extract images from.  It should either come from the download in the previous section or a video that you copied into the folder: '1 - Video'" Style="{StaticResource helpTextBlock}"/>
+                        <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
+                            <Label Content="Video"/>
+                            <TextBlock VerticalAlignment="Center">
+                                <Hyperlink Click="VideoToExtractFromHelp_Click">?</Hyperlink>
+                            </TextBlock>
+                        </StackPanel>
+                        <ComboBox x:Name="cboVideoToExtractFrom" SelectionChanged="cboVideoToExtractFrom_SelectionChanged"/>
 
+                        
+                        
+                        
+                        
+                        
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
-                                <ColumnDefinition Width="2*"/>
+                                <ColumnDefinition Width="1*"/>
                                 <ColumnDefinition Width="8"/>
                                 <ColumnDefinition Width="3*"/>
                             </Grid.ColumnDefinitions>
@@ -118,13 +151,27 @@
                                 <RowDefinition Height="auto"/>
                             </Grid.RowDefinitions>
 
+                            
+                            
+                            
+                            
                             <!-- Extract Frames -->
                             <Label Grid.Column="0" Grid.Row="0" Content="Every X Frames"/>
-                            <TextBox Grid.Column="0" Grid.Row="1" x:Name="txtExtractEveryXFrames"/>
+                            <TextBox Grid.Column="0" Grid.Row="1" x:Name="txtExtractEveryXFrames" TextChanged="txtExtractEveryXFrames_TextChanged"/>
 
+                            
+                            
+                            
+                            
+                            
+                            
+                            
                             <!-- Time Windows -->
-                            <Label Grid.Column="2" Grid.Row="0" Content="Time Windows [optional]"/>
-                            <Label Grid.Column="2" Grid.Row="0" Content="example-- 3:14 3:35, 6:05 7:42" FontSize="10" Foreground="#808080" HorizontalAlignment="Right" VerticalAlignment="Bottom"/>
+                            <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
+                                <Label Content="Time Windows"/>
+                                <Label Content="[optional]" VerticalAlignment="Bottom" Margin="-3,0,0,0" Style="{StaticResource noteLabel}"/>
+                            </StackPanel>
+                            <Label Grid.Column="2" Grid.Row="0" Content="example-- 3:14 3:35, 6:05 7:42" HorizontalAlignment="Right" VerticalAlignment="Bottom" Style="{StaticResource noteLabel}"/>
                             <TextBox Grid.Column="2" Grid.Row="1" x:Name="txtTimeWindows"/>
                         </Grid>
 

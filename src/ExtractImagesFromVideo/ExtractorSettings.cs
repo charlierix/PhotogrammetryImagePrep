@@ -13,6 +13,7 @@ namespace ExtractImagesFromVideo
     {
         public string BaseFolder { get; set; }
         public string YoutubeDL { get; set; }
+        public string VLC { get; set; }
 
         public static ExtractorSettings GetSettingsFromDrive()
         {

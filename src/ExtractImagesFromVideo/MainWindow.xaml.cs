@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Controls;
@@ -41,6 +42,8 @@ namespace ExtractImagesFromVideo
 
         private ExtractorSettings _settings = null;
 
+        private Process _videoDownload = null;
+
         #endregion
 
         #region Constructor
@@ -75,10 +78,15 @@ namespace ExtractImagesFromVideo
                 txtBaseFolder.Text = _settings.BaseFolder;
 
                 txtYoutubeDLLocation.Text = _settings.YoutubeDL ?? "";
+                txtVLCLocation.Text = _settings.VLC ?? "";
 
                 //NOTE: the text change event listeners may have fired above, but not if going from "" to ""
                 RefreshFolderNames();
                 txtYoutubeDLLocation_TextChanged(this, null);
+                txtVideoURL_TextChanged(this, null);
+                txtVLCLocation_TextChanged(this, null);
+                cboVideoToExtractFrom_SelectionChanged(this, null);
+                txtExtractEveryXFrames_TextChanged(this, null);
             }
             catch (Exception ex)
             {
@@ -162,7 +170,45 @@ namespace ExtractImagesFromVideo
                 ShowErrorMessage(ex.ToString());
             }
         }
+        private void DownloadVideoHelp_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblDownloadVideoHelp);
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+        private void Hyperlink_DownloadVLC(object sender, RequestNavigateEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblVLCHelp);
 
+                OpenURL(e.Uri.AbsoluteUri);
+
+                e.Handled = true;
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+        private void VideoToExtractFromHelp_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblVideoToExtractFromHelp);
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+
+        // ------------- Session
         private void txtBaseFolder_PreviewDragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -236,6 +282,7 @@ namespace ExtractImagesFromVideo
             }
         }
 
+        // ------------- Download Video
         private void txtYoutubeDLLocation_PreviewDragEnter(object sender, DragEventArgs e)
         {
             if (e.Data.GetDataPresent(DataFormats.FileDrop))
@@ -295,10 +342,35 @@ namespace ExtractImagesFromVideo
             }
         }
 
+        private void txtVideoURL_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                if (Regex.IsMatch(txtVideoURL.Text, @"^http(s|)://\w", RegexOptions.IgnoreCase))
+                {
+                    txtVideoURL.Effect = null;
+                }
+                else
+                {
+                    txtVideoURL.Effect = _errorEffect;
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+
         private void DownloadVideo_Click(object sender, RoutedEventArgs e)
         {
             try
             {
+                if (_videoDownload != null)
+                {
+                    ShowErrorMessage("A download is still running");
+                    return;
+                }
+
                 if (!_sessionFolders.IsValid)
                 {
                     ShowErrorMessage("Need to specify folder first");
@@ -323,6 +395,9 @@ namespace ExtractImagesFromVideo
                     return;
                 }
 
+                using (StreamWriter writer = File.AppendText(System.IO.Path.Combine(_sessionFolders.VideoFolder, "log.txt")))
+                    writer.WriteLine(txtVideoURL.Text);
+
                 //https://github.com/ytdl-org/youtube-dl/blob/master/README.md#options
 
                 // Putting a number in front in case they download multiple videos.  It guarantees uniqueness and shows the order
@@ -332,11 +407,138 @@ namespace ExtractImagesFromVideo
 
                 string args = string.Format("-o \"{0}\\{1} - %(title)s.%(ext)s\" {2}", _sessionFolders.VideoFolder, fileNumber, txtVideoURL.Text);
 
-                Process.Start(txtYoutubeDLLocation.Text, args);
+                _videoDownload = new Process()
+                {
+                    StartInfo = new ProcessStartInfo(txtYoutubeDLLocation.Text, args),
+                    EnableRaisingEvents = true,
+                };
+                _videoDownload.Exited += VideoDownload_Exited;
+                _videoDownload.Start();
             }
             catch (Exception ex)
             {
                 ShowErrorMessage(ex.Message);
+            }
+        }
+
+        private void VideoDownload_Exited(object sender, EventArgs e)
+        {
+            try
+            {
+                var callback = new Action(() =>
+                {
+                    RefreshFolderNames();
+                    _videoDownload = null;
+                });
+
+                if (Dispatcher.CheckAccess()) // CheckAccess returns true if you're on the dispatcher thread
+                    callback();
+                else
+                    Dispatcher.Invoke(callback);
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+
+        // ------------- Extract Images
+        private void txtVLCLocation_PreviewDragEnter(object sender, DragEventArgs e)
+        {
+            if (e.Data.GetDataPresent(DataFormats.FileDrop))
+            {
+                e.Effects = DragDropEffects.Copy;
+            }
+            else
+            {
+                e.Effects = DragDropEffects.None;
+            }
+
+            e.Handled = true;
+        }
+        private void txtVLCLocation_Drop(object sender, DragEventArgs e)
+        {
+            try
+            {
+                string[] filenames = e.Data.GetData(DataFormats.FileDrop) as string[];
+
+                if (filenames == null || filenames.Length == 0)
+                {
+                    ShowErrorMessage("No files selected");
+                    return;
+                }
+                else if (filenames.Length > 1)
+                {
+                    ShowErrorMessage("Only one file allowed");
+                    return;
+                }
+
+                txtVLCLocation.Text = filenames[0];
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+
+        private void txtVLCLocation_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                if (File.Exists(txtVLCLocation.Text))
+                {
+                    txtVLCLocation.Effect = null;
+                }
+                else
+                {
+                    txtVLCLocation.Effect = _errorEffect;
+                }
+
+                _settings.VLC = txtVLCLocation.Text;
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+
+        private void cboVideoToExtractFrom_SelectionChanged(object sender, SelectionChangedEventArgs e)
+        {
+            try
+            {
+                string text = cboVideoToExtractFrom.SelectedValue?.ToString().Trim() ?? "";
+
+                if (text == "")
+                {
+                    cboVideoToExtractFrom.Effect = _errorEffect;
+                }
+                else
+                {
+                    cboVideoToExtractFrom.Effect = null;
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+
+        private void txtExtractEveryXFrames_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                if (Regex.IsMatch(txtExtractEveryXFrames.Text, @"^\d+$"))
+                {
+                    txtExtractEveryXFrames.Effect = null;
+                }
+                else
+                {
+                    txtExtractEveryXFrames.Effect = _errorEffect;
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
             }
         }
 
@@ -389,6 +591,15 @@ namespace ExtractImagesFromVideo
                     {
                         cboSession.Items.Add(System.IO.Path.GetFileName(childFolder));      // only want the portion after the last \
                     }
+                }
+            }
+
+            cboVideoToExtractFrom.Items.Clear();
+            if (_sessionFolders.IsValid && Directory.Exists(_sessionFolders.VideoFolder))
+            {
+                foreach (string video in Directory.GetFiles(_sessionFolders.VideoFolder).Where(o => !o.EndsWith(".txt", StringComparison.OrdinalIgnoreCase)).OrderBy(o => o))
+                {
+                    cboVideoToExtractFrom.Items.Add(System.IO.Path.GetFileName(video));
                 }
             }
         }
