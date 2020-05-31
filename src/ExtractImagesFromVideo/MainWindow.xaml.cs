@@ -87,6 +87,7 @@ namespace ExtractImagesFromVideo
                 txtVLCLocation_TextChanged(this, null);
                 cboVideoToExtractFrom_SelectionChanged(this, null);
                 txtExtractEveryXFrames_TextChanged(this, null);
+                txtTimeWindows_TextChanged(this, null);
             }
             catch (Exception ex)
             {
@@ -201,6 +202,28 @@ namespace ExtractImagesFromVideo
             try
             {
                 ShowHelpMessage(lblVideoToExtractFromHelp);
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+        private void ExtractFramesHelp_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblExtractFramesHelp);
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+        private void TimeWindowsHelp_Click(object sender, RoutedEventArgs e)
+        {
+            try
+            {
+                ShowHelpMessage(lblTimeWindowsHelp);
             }
             catch (Exception ex)
             {
@@ -429,6 +452,9 @@ namespace ExtractImagesFromVideo
                 {
                     RefreshFolderNames();
                     _videoDownload = null;
+
+                    if (cboVideoToExtractFrom.Items.Count == 1)
+                        cboVideoToExtractFrom.SelectedIndex = 0;
                 });
 
                 if (Dispatcher.CheckAccess()) // CheckAccess returns true if you're on the dispatcher thread
@@ -542,9 +568,109 @@ namespace ExtractImagesFromVideo
             }
         }
 
+        private void txtTimeWindows_TextChanged(object sender, TextChangedEventArgs e)
+        {
+            try
+            {
+                var windows = ParseTimeWindows(txtTimeWindows.Text);
+                if (windows.errMsg == null)
+                {
+                    txtTimeWindows.Effect = null;
+                }
+                else
+                {
+                    txtTimeWindows.Effect = _errorEffect;
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
+        }
+
         private void ExtractImages_Click(object sender, RoutedEventArgs e)
         {
+            try
+            {
+                if (!_sessionFolders.IsValid)
+                {
+                    ShowErrorMessage("Need to specify folder first");
+                    return;
+                }
 
+                if (string.IsNullOrWhiteSpace(txtVLCLocation.Text))
+                {
+                    ShowErrorMessage("Need to point to vlc.exe first");
+                    return;
+                }
+
+                string video = cboVideoToExtractFrom.SelectedValue?.ToString().Trim() ?? "";
+                if (video == "")
+                {
+                    ShowErrorMessage("Need to specify which video to extract from first");
+                    return;
+                }
+
+                if (!int.TryParse(txtExtractEveryXFrames.Text, out int everyXFrames))        // --scene-ratio=<integer [1 .. 2147483647]>
+                {
+                    ShowErrorMessage("Couldn't parse Every X Frames as an integer");
+                    return;
+                }
+                else if (everyXFrames < 1)
+                {
+                    ShowErrorMessage("Every X Frames must be 1 or more");
+                    return;
+                }
+
+                var timeWindows = ParseTimeWindows(txtTimeWindows.Text);
+                if (!string.IsNullOrWhiteSpace(timeWindows.errMsg))
+                {
+                    ShowErrorMessage($"Invalid time windows: {timeWindows.errMsg}");
+                    return;
+                }
+
+                EnsureFoldersExist_SaveSettings();
+                if (!_sessionFolders.DoFoldersExist)
+                {
+                    return;
+                }
+
+                string[] subFolders = CreateImageSnapshotSubfolders(_sessionFolders.ImagesFolder, Math.Max(1, timeWindows.windows.Length), video);
+
+                using (StreamWriter writer = File.AppendText(System.IO.Path.Combine(_sessionFolders.ImagesFolder, "log.txt")))
+                {
+                    for (int cntr = 0; cntr < subFolders.Length; cntr++)
+                    {
+                        writer.WriteLine(string.Format("{0}\tevery {1} frames\t{2}", video, everyXFrames, timeWindows.windows.Length == 0 ? "full video" : $"{timeWindows.windows[cntr].start} to {timeWindows.windows[cntr].stop} seconds"));
+                    }
+                }
+
+                //https://wiki.videolan.org/VLC_command-line_help
+
+                var getArgs = new Func<string, string>(f => string.Format("\"{0}\" --scene-path=\"{1}\" --video-filter=scene --play-and-exit --scene-ratio={2}",
+                    System.IO.Path.Combine(_sessionFolders.VideoFolder, video),
+                    f,
+                    everyXFrames));
+
+                if (timeWindows.windows.Length == 0)
+                {
+                    Process.Start(txtVLCLocation.Text, getArgs(subFolders[0]));
+                }
+                else
+                {
+                    for (int cntr = 0; cntr < subFolders.Length; cntr++)
+                    {
+                        string args = getArgs(subFolders[cntr]);
+                        args += string.Format(" --start-time={0} --stop-time={1}", timeWindows.windows[cntr].start, timeWindows.windows[cntr].stop);
+
+                        Process.Start(txtVLCLocation.Text, args);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                ShowErrorMessage(ex.ToString());
+            }
         }
 
         #endregion
@@ -662,10 +788,18 @@ namespace ExtractImagesFromVideo
 
         private void ShowHelpMessage(UIElement helpLabel)
         {
+            // It's cleaner to just show one message at a time
+            foreach (UIElement showing in _helpMessages)
+                showing.Visibility = Visibility.Collapsed;
+
+            _helpMessages.Clear();
+
+            // Show the message
             helpLabel.Visibility = Visibility.Visible;
 
             _helpMessages.Add(helpLabel);
 
+            // Reset the timer that will hide the message after a while
             _hideHelpTimer.Stop();
             _hideHelpTimer.Start();
         }
@@ -681,6 +815,196 @@ namespace ExtractImagesFromVideo
                 txtErrorMessage.Text = message;
                 txtErrorMessage.Visibility = Visibility.Visible;
             }
+        }
+
+        private static (string errMsg, (int start, int stop)[] windows) ParseTimeWindows(string text)
+        {
+            if (string.IsNullOrWhiteSpace(text))
+            {
+                return (null, new (int, int)[0]);
+            }
+
+            if (!Regex.IsMatch(text, @"^[\d:,\s]+$"))
+            {
+                return ("Invalid characters", null);
+            }
+
+            // Regex Parse
+            var matches = new List<Match>();
+            foreach (Match match in Regex.Matches(text, @"(?<first>\d{0,2}):(?<second>\d{2})(?<third>:\d{2}|)"))        // ignoring the commas.  they were mentioned to help the user keep things straight
+            {
+                matches.Add(match);
+            }
+
+            if (matches.Count == 0)
+            {
+                return ("Invalid format", null);
+            }
+
+            var groups = matches.
+                Select(o => new
+                {
+                    first = o.Groups["first"].Value,
+                    second = o.Groups["second"].Value,
+                    third = o.Groups["third"].Value,
+                }).
+                ToArray();
+
+            // Gaps (parts of the string that regex didn't pick up)
+            string unmatchedString = GetUnmatchedStringPortion(text, matches);
+
+            if (Regex.IsMatch(unmatchedString, @"[\d:]"))
+            {
+                return ("Contains partial time fragment", null);
+            }
+
+            // Validate 0 - 59
+            var outOfRange = groups.
+                SelectMany(o => new[]
+                {
+                    o.first == "" ? 0 : int.Parse(o.first),     // first can be minutes or hours, so limiting hours to be between 0-59 is a bit arbitrary, but I doubt anyone is dealing with 100 hour videos
+                    int.Parse(o.second),
+                    o.third == "" ? 0 : int.Parse(o.third.Substring(1)),
+                }).
+                Where(o => o > 59).
+                ToArray();
+
+            if (outOfRange.Length > 0)
+            {
+                return (string.Format("Times must be 0 to 59 ({0})", string.Join("|", outOfRange)), null);
+            }
+
+            // Validate even number
+            if (matches.Count % 2 == 1)
+            {
+                return ("Mismatched time stamps", null);
+            }
+
+            // Convert to int
+            int[] asTime = groups.
+                Select(o =>
+                {
+                    int first = o.first == "" ?
+                        0 :
+                        int.Parse(o.first);
+
+                    int second = int.Parse(o.second);
+
+                    if (o.third == "")
+                    {
+                        return (first * 60) + second;
+                    }
+                    else
+                    {
+                        return (first * 3600) + (second * 60) + int.Parse(o.third.Substring(1));
+                    }
+                }).
+                ToArray();
+
+            var sets = Enumerable.Range(0, asTime.Length / 2).
+                Select(o => (asTime[o * 2], asTime[o * 2 + 1])).
+                ToArray();
+
+            // Validate backward (4:15 3:05)
+            var backward = Enumerable.Range(0, sets.Length).
+                Select(o => new
+                {
+                    match1 = matches[o * 2],
+                    match2 = matches[o * 2 + 1],
+                    time = sets[o],
+                }).
+                Where(o => o.time.Item1 >= o.time.Item2).
+                Select(o => $"{o.match1} {o.match2}").
+                ToArray();
+
+            if (backward.Length > 0)
+            {
+                return (string.Format("From time must be less than to time ({0})", string.Join(", ", backward)), null);
+            }
+
+            // Validate intersecting pairs (1:00 2:00, :30 2:30)
+            var intersections = new List<(int, int)>();
+            for (int outer = 0; outer < sets.Length; outer++)
+            {
+                for (int inner = 0; inner < sets.Length; inner++)
+                {
+                    if (outer == inner)
+                        continue;
+
+                    if (sets[outer].Item1 >= sets[inner].Item1 && sets[outer].Item1 <= sets[inner].Item2)
+                        intersections.Add((outer, inner));
+                    else if (sets[outer].Item2 >= sets[inner].Item1 && sets[outer].Item2 <= sets[inner].Item2)
+                        intersections.Add((outer, inner));
+                }
+            }
+
+            intersections = intersections.
+                Select(o => (Math.Min(o.Item1, o.Item2), Math.Max(o.Item1, o.Item2))).
+                Distinct().
+                ToList();
+
+            if (intersections.Count > 0)
+            {
+                string[] descriptions = intersections.
+                    Select(o => $"{matches[o.Item1 * 2]} {matches[o.Item1 * 2 + 1]} - {matches[o.Item2 * 2]} {matches[o.Item2 * 2 + 1]}").
+                    ToArray();
+
+                return (string.Format("Time windows straddle each other ({0})", string.Join("|", descriptions)), null);
+            }
+
+            return (null, sets);
+        }
+
+        private static string GetUnmatchedStringPortion(string text, List<Match> matches)
+        {
+            StringBuilder retVal = new StringBuilder();
+
+            int index = 0;
+
+            foreach (Match match in matches)
+            {
+                if (match.Index > index)
+                {
+                    retVal.Append(text.Substring(index, match.Index - index));
+                }
+
+                index = match.Index + match.Length;
+            }
+
+            if (index < text.Length)
+            {
+                retVal.Append(text.Substring(index));
+            }
+
+            return retVal.ToString();
+        }
+
+        private static string[] CreateImageSnapshotSubfolders(string parentFolder, int count, string videoName)
+        {
+            // If the video was downloaded by this tool, it will have a digit in front.  Don't include that in the sub
+            // folders, because it's just annoying
+            Match startsWithNum = Regex.Match(videoName, @"^(?<remove>\d+ - ).");
+            if (startsWithNum.Success)
+            {
+                videoName = videoName.Substring(startsWithNum.Groups["remove"].Length);
+            }
+
+            // Use a counter to make sure folders are unique (especially useful if they hit extract button multiple times)
+            int startCount = Directory.GetDirectories(parentFolder).Length;
+            startCount++;
+
+            string subName = System.IO.Path.GetFileNameWithoutExtension(videoName);
+
+            string[] retVal = Enumerable.Range(0, count).
+                Select(o => System.IO.Path.Combine(parentFolder, $"{startCount + o} - {subName}")).
+                ToArray();
+
+            foreach (string childFolder in retVal)
+            {
+                Directory.CreateDirectory(childFolder);
+            }
+
+            return retVal;
         }
 
         #endregion

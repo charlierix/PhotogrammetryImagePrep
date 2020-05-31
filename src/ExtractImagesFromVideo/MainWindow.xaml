@@ -100,7 +100,7 @@
                         <TextBox x:Name="txtVideoURL" TextChanged="txtVideoURL_TextChanged"/>
 
                         <!-- Download Button -->
-                        <TextBlock x:Name="lblDownloadVideoHelp" Text="This will download the video.  Note that it's ok to download multiple videos, each time a video is downloaded, it will be prefixed with a counter" Style="{StaticResource helpTextBlock}"/>
+                        <TextBlock x:Name="lblDownloadVideoHelp" Text="This will download the video.  Note that it's ok to download multiple videos into this folder, each time a video is downloaded, it will be prefixed with a counter" Style="{StaticResource helpTextBlock}"/>
                         <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Margin="0,24,0,0">
                             <TextBlock VerticalAlignment="Center" Margin="0,0,8,0">
                                 <Hyperlink Click="DownloadVideoHelp_Click">?</Hyperlink>
@@ -113,7 +113,7 @@
                 </Expander>
 
                 <!-- Extract Images -->
-                <Expander IsExpanded="True" Header="Extract images from video" Margin="0,8,0,0">
+                <Expander Header="Extract images from video" Margin="0,8,0,0">
                     <StackPanel Margin="8">
                         <!-- VLC Location -->
                         <TextBlock x:Name="lblVLCHelp" Text="VLC media player has a mode that can grab images from a video every X frames.  Download and install the player (be careful, it tries to associate all file types to it), then drag that executable onto the textbox (or paste its location into the textbox)" Style="{StaticResource helpTextBlock}"/>
@@ -124,7 +124,7 @@
                             </TextBlock>
                         </StackPanel>
                         <TextBox x:Name="txtVLCLocation" AllowDrop="True" PreviewDragEnter="txtVLCLocation_PreviewDragEnter" PreviewDragOver="txtVLCLocation_PreviewDragEnter" Drop="txtVLCLocation_Drop" TextChanged="txtVLCLocation_TextChanged"/>
-                        
+
                         <!-- Video -->
                         <TextBlock x:Name="lblVideoToExtractFromHelp" Text="This is the video to extract images from.  It should either come from the download in the previous section or a video that you copied into the folder: '1 - Video'" Style="{StaticResource helpTextBlock}"/>
                         <StackPanel Orientation="Horizontal" Margin="0,8,0,0">
@@ -136,10 +136,9 @@
                         <ComboBox x:Name="cboVideoToExtractFrom" SelectionChanged="cboVideoToExtractFrom_SelectionChanged"/>
 
                         
-                        
-                        
-                        
-                        
+                        <TextBlock x:Name="lblExtractFramesHelp" Text="Ratio of images to record.  30 means that one image out of thirty is recorded.  It doesn't look like there's a way to know the FPS of a video (it could be variable), so you may need to experiment" Style="{StaticResource helpTextBlock}"/>
+                        <TextBlock x:Name="lblTimeWindowsHelp" Style="{StaticResource helpTextBlock}">Leave blank to extract images from the whole video<LineBreak/><LineBreak/>If there are only portions of a file that you want images for, enter a time window, hit extract, enter another window, hit extract, etc.  Or you can enter multiple windows separated by commas<LineBreak/><LineBreak/>Each window or push of the extract button will create a new image subfolder</TextBlock>
+
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
                                 <ColumnDefinition Width="1*"/>
@@ -151,32 +150,28 @@
                                 <RowDefinition Height="auto"/>
                             </Grid.RowDefinitions>
 
-                            
-                            
-                            
-                            
                             <!-- Extract Frames -->
-                            <Label Grid.Column="0" Grid.Row="0" Content="Every X Frames"/>
-                            <TextBox Grid.Column="0" Grid.Row="1" x:Name="txtExtractEveryXFrames" TextChanged="txtExtractEveryXFrames_TextChanged"/>
+                            <StackPanel Orientation="Horizontal">
+                                <Label Grid.Column="0" Grid.Row="0" Content="Every X Frames"/>
+                                <TextBlock VerticalAlignment="Center">
+                                    <Hyperlink Click="ExtractFramesHelp_Click">?</Hyperlink>
+                                </TextBlock>
+                            </StackPanel>
+                            <TextBox Grid.Column="0" Grid.Row="1" x:Name="txtExtractEveryXFrames" Text="15" TextChanged="txtExtractEveryXFrames_TextChanged"/>
 
-                            
-                            
-                            
-                            
-                            
-                            
-                            
                             <!-- Time Windows -->
                             <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
                                 <Label Content="Time Windows"/>
                                 <Label Content="[optional]" VerticalAlignment="Bottom" Margin="-3,0,0,0" Style="{StaticResource noteLabel}"/>
+                                <TextBlock VerticalAlignment="Center">
+                                    <Hyperlink Click="TimeWindowsHelp_Click">?</Hyperlink>
+                                </TextBlock>
                             </StackPanel>
                             <Label Grid.Column="2" Grid.Row="0" Content="example-- 3:14 3:35, 6:05 7:42" HorizontalAlignment="Right" VerticalAlignment="Bottom" Style="{StaticResource noteLabel}"/>
-                            <TextBox Grid.Column="2" Grid.Row="1" x:Name="txtTimeWindows"/>
+                            <TextBox Grid.Column="2" Grid.Row="1" x:Name="txtTimeWindows" TextChanged="txtTimeWindows_TextChanged"/>
                         </Grid>
 
                         <Button Content="Extract" HorizontalAlignment="Right" Margin="0,24,0,0" Click="ExtractImages_Click"/>
-
 
                     </StackPanel>
                 </Expander>

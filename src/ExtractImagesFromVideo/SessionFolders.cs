@@ -11,8 +11,8 @@ namespace ExtractImagesFromVideo
     public class SessionFolders
     {
         private const string FOLDER_VIDEO = "1 - Video";
-        // 2 - Images
-        // 3 - Final Images?
+        private const string FOLDER_IMAGES = "2 - Images";
+        // 3 - Final Images?        this gets messy because there could be multiple sets of images, each becoming a separate meshroom object
         // 4 - Meshroom
         // 5 - Post Meshroom (blender, other smoothing apps)
 
@@ -24,6 +24,7 @@ namespace ExtractImagesFromVideo
 
             SessionFolder = "";
             VideoFolder = "";
+            ImagesFolder = "";
 
             IsValid_Base = true;
             IsValid_Session = true;
@@ -43,6 +44,7 @@ namespace ExtractImagesFromVideo
 
             SessionFolder = System.IO.Path.Combine(BaseFolder, SessionName);
             VideoFolder = System.IO.Path.Combine(SessionFolder, FOLDER_VIDEO);
+            ImagesFolder = System.IO.Path.Combine(SessionFolder, FOLDER_IMAGES);
         }
 
         public void EnsureFoldersExist()
@@ -73,6 +75,9 @@ namespace ExtractImagesFromVideo
                 step = "video";
                 Directory.CreateDirectory(VideoFolder);
 
+                step = "images";
+                Directory.CreateDirectory(ImagesFolder);
+
                 DoFoldersExist = true;
             }
             catch (Exception ex)
@@ -93,6 +98,7 @@ namespace ExtractImagesFromVideo
         public string BaseFolder { get; private set; }
         public string SessionFolder { get; private set; }
         public string VideoFolder { get; private set; }
+        public string ImagesFolder { get; private set; }
 
         public string SessionName { get; private set; }
     }
