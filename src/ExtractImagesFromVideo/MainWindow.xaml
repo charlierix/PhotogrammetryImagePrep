@@ -135,9 +135,9 @@
                         </StackPanel>
                         <ComboBox x:Name="cboVideoToExtractFrom" SelectionChanged="cboVideoToExtractFrom_SelectionChanged"/>
 
-                        
+
                         <TextBlock x:Name="lblExtractFramesHelp" Text="Ratio of images to record.  30 means that one image out of thirty is recorded.  It doesn't look like there's a way to know the FPS of a video (it could be variable), so you may need to experiment" Style="{StaticResource helpTextBlock}"/>
-                        <TextBlock x:Name="lblTimeWindowsHelp" Style="{StaticResource helpTextBlock}">Leave blank to extract images from the whole video<LineBreak/><LineBreak/>If there are only portions of a file that you want images for, enter a time window, hit extract, enter another window, hit extract, etc.  Or you can enter multiple windows separated by commas<LineBreak/><LineBreak/>Each window or push of the extract button will create a new image subfolder</TextBlock>
+                        <TextBlock x:Name="lblTimeWindowsHelp" Style="{StaticResource helpTextBlock}">Leave blank to extract images from the whole video<LineBreak/><LineBreak/>If there are portions of the video to extract from, enter the time window, give it a name.  Each time window should be on its own line<LineBreak/><LineBreak/>Each time window will be extracted into a separate folder<LineBreak/><LineBreak/>If minute portion is zero, it can be left off (0:15 or just :15)</TextBlock>
 
                         <Grid Margin="0,8,0,0">
                             <Grid.ColumnDefinitions>
@@ -151,24 +151,29 @@
                             </Grid.RowDefinitions>
 
                             <!-- Extract Frames -->
-                            <StackPanel Orientation="Horizontal">
+                            <StackPanel Orientation="Horizontal" VerticalAlignment="Bottom">
                                 <Label Grid.Column="0" Grid.Row="0" Content="Every X Frames"/>
                                 <TextBlock VerticalAlignment="Center">
                                     <Hyperlink Click="ExtractFramesHelp_Click">?</Hyperlink>
                                 </TextBlock>
                             </StackPanel>
-                            <TextBox Grid.Column="0" Grid.Row="1" x:Name="txtExtractEveryXFrames" Text="15" TextChanged="txtExtractEveryXFrames_TextChanged"/>
+                            <TextBox Grid.Column="0" Grid.Row="1" x:Name="txtExtractEveryXFrames" Text="6" VerticalAlignment="Top" TextChanged="txtExtractEveryXFrames_TextChanged"/>
 
                             <!-- Time Windows -->
-                            <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal">
+                            <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal" VerticalAlignment="Bottom">
                                 <Label Content="Time Windows"/>
-                                <Label Content="[optional]" VerticalAlignment="Bottom" Margin="-3,0,0,0" Style="{StaticResource noteLabel}"/>
+                                <Label Content="[optional]" VerticalAlignment="Bottom" Margin="-6,0,0,2" Style="{StaticResource noteLabel}"/>
                                 <TextBlock VerticalAlignment="Center">
                                     <Hyperlink Click="TimeWindowsHelp_Click">?</Hyperlink>
                                 </TextBlock>
                             </StackPanel>
-                            <Label Grid.Column="2" Grid.Row="0" Content="example-- 3:14 3:35, 6:05 7:42" HorizontalAlignment="Right" VerticalAlignment="Bottom" Style="{StaticResource noteLabel}"/>
-                            <TextBox Grid.Column="2" Grid.Row="1" x:Name="txtTimeWindows" TextChanged="txtTimeWindows_TextChanged"/>
+                            <StackPanel Grid.Column="2" Grid.Row="0" Orientation="Horizontal" HorizontalAlignment="Right" VerticalAlignment="Bottom">
+                                <Label Content="example:" VerticalAlignment="Center" Style="{StaticResource noteLabel}"/>
+                                <Label Style="{StaticResource noteLabel}">
+                                    <TextBlock>3:14 3:35 left side<LineBreak/>6:05 7:42 rear</TextBlock>
+                                </Label>
+                            </StackPanel>
+                            <TextBox Grid.Column="2" Grid.Row="1" x:Name="txtTimeWindows" AcceptsReturn="True" VerticalAlignment="Top" TextChanged="txtTimeWindows_TextChanged"/>
                         </Grid>
 
                         <Button Content="Extract" HorizontalAlignment="Right" Margin="0,24,0,0" Click="ExtractImages_Click"/>

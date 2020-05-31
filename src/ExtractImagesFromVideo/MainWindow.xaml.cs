@@ -611,7 +611,7 @@ namespace ExtractImagesFromVideo
                     return;
                 }
 
-                if (!int.TryParse(txtExtractEveryXFrames.Text, out int everyXFrames))        // --scene-ratio=<integer [1 .. 2147483647]>
+                if (!int.TryParse(txtExtractEveryXFrames.Text, out int everyXFrames))
                 {
                     ShowErrorMessage("Couldn't parse Every X Frames as an integer");
                     return;
@@ -635,13 +635,17 @@ namespace ExtractImagesFromVideo
                     return;
                 }
 
-                string[] subFolders = CreateImageSnapshotSubfolders(_sessionFolders.ImagesFolder, Math.Max(1, timeWindows.windows.Length), video);
+                string[] subFolders = CreateImageSnapshotSubfolders(new[] { _sessionFolders.ImagesFolder, _sessionFolders.MeshroomFolder, _sessionFolders.BlenderFolder }, timeWindows.windows);
 
                 using (StreamWriter writer = File.AppendText(System.IO.Path.Combine(_sessionFolders.ImagesFolder, "log.txt")))
                 {
                     for (int cntr = 0; cntr < subFolders.Length; cntr++)
                     {
-                        writer.WriteLine(string.Format("{0}\tevery {1} frames\t{2}", video, everyXFrames, timeWindows.windows.Length == 0 ? "full video" : $"{timeWindows.windows[cntr].start} to {timeWindows.windows[cntr].stop} seconds"));
+                        writer.WriteLine(string.Format("{0}\tevery {1} frame{2}\t{3}\t{4}",
+                            video,
+                            everyXFrames, everyXFrames == 1 ? "" : "s",
+                            timeWindows.windows.Length == 0 ? "full video" : $"{timeWindows.windows[cntr].start} to {timeWindows.windows[cntr].stop} seconds",
+                            timeWindows.windows.Length == 0 ? "" : timeWindows.windows[cntr].name));
                     }
                 }
 
@@ -817,55 +821,64 @@ namespace ExtractImagesFromVideo
             }
         }
 
-        private static (string errMsg, (int start, int stop)[] windows) ParseTimeWindows(string text)
+        private static (string errMsg, (int start, int stop, string name)[] windows) ParseTimeWindows(string text)
         {
             if (string.IsNullOrWhiteSpace(text))
             {
-                return (null, new (int, int)[0]);
+                return (null, new (int, int, string)[0]);
             }
 
-            if (!Regex.IsMatch(text, @"^[\d:,\s]+$"))
-            {
-                return ("Invalid characters", null);
-            }
+            // Lines
+            string[] lines = text.
+                Replace("\r\n", "\n").
+                Split('\n').
+                Select(o => o.Trim()).
+                Where(o => o != "").
+                ToArray();
 
-            // Regex Parse
-            var matches = new List<Match>();
-            foreach (Match match in Regex.Matches(text, @"(?<first>\d{0,2}):(?<second>\d{2})(?<third>:\d{2}|)"))        // ignoring the commas.  they were mentioned to help the user keep things straight
-            {
-                matches.Add(match);
-            }
-
-            if (matches.Count == 0)
-            {
-                return ("Invalid format", null);
-            }
-
-            var groups = matches.
+            // Regex
+            var matches = lines.
                 Select(o => new
                 {
-                    first = o.Groups["first"].Value,
-                    second = o.Groups["second"].Value,
-                    third = o.Groups["third"].Value,
+                    line = o,
+                    match = Regex.Match(o, @"^(?<first1>\d{0,2}):(?<second1>\d{2})(?<third1>:\d{2}|)\s+(?<first2>\d{0,2}):(?<second2>\d{2})(?<third2>:\d{2}|)\s+(?<name>.+)$"),
                 }).
                 ToArray();
 
-            // Gaps (parts of the string that regex didn't pick up)
-            string unmatchedString = GetUnmatchedStringPortion(text, matches);
+            var nonMatches = matches.
+                Where(o => !o.match.Success).
+                ToArray();
 
-            if (Regex.IsMatch(unmatchedString, @"[\d:]"))
+            if (nonMatches.Length > 0)
             {
-                return ("Contains partial time fragment", null);
+                return (string.Format("Invalid format:\r\n{0}", string.Join("\r\n", nonMatches.Select(o => o.line))), null);
             }
 
-            // Validate 0 - 59
-            var outOfRange = groups.
-                SelectMany(o => new[]
+            // Fields
+            var fields = matches.
+                Select(o => new
                 {
-                    o.first == "" ? 0 : int.Parse(o.first),     // first can be minutes or hours, so limiting hours to be between 0-59 is a bit arbitrary, but I doubt anyone is dealing with 100 hour videos
-                    int.Parse(o.second),
-                    o.third == "" ? 0 : int.Parse(o.third.Substring(1)),
+                    first1 = o.match.Groups["first1"].Value,
+                    second1 = o.match.Groups["second1"].Value,
+                    third1 = o.match.Groups["third1"].Value,
+                    first2 = o.match.Groups["first2"].Value,
+                    second2 = o.match.Groups["second2"].Value,
+                    third2 = o.match.Groups["third2"].Value,
+                    name = o.match.Groups["name"].Value,
                 }).
+                ToArray();
+
+            // Validate 0 - 59
+            var toIntArr = new Func<string, string, string, int[]>((f, s, t) => new[]
+            {
+                f == "" ? 0 : int.Parse(f),     // first can be minutes or hours, so limiting hours to be between 0-59 is a bit arbitrary, but I doubt anyone is dealing with 100 hour videos
+                int.Parse(s),
+                t == "" ? 0 : int.Parse(t.Substring(1)),
+            });
+
+            var outOfRange = fields.Select(o => toIntArr(o.first1, o.second1, o.third1)).
+                Concat(fields.Select(o => toIntArr(o.first2, o.second2, o.third2))).
+                SelectMany(o => o).
                 Where(o => o > 59).
                 ToArray();
 
@@ -874,66 +887,62 @@ namespace ExtractImagesFromVideo
                 return (string.Format("Times must be 0 to 59 ({0})", string.Join("|", outOfRange)), null);
             }
 
-            // Validate even number
-            if (matches.Count % 2 == 1)
-            {
-                return ("Mismatched time stamps", null);
-            }
-
             // Convert to int
-            int[] asTime = groups.
-                Select(o =>
+            var toInt = new Func<string, string, string, int>((f, s, t) =>
+            {
+                int first = f == "" ?
+                    0 :
+                    int.Parse(f);
+
+                int second = int.Parse(s);
+
+                if (t == "")
                 {
-                    int first = o.first == "" ?
-                        0 :
-                        int.Parse(o.first);
+                    return (first * 60) + second;
+                }
+                else
+                {
+                    return (first * 3600) + (second * 60) + int.Parse(t.Substring(1));
+                }
+            });
 
-                    int second = int.Parse(o.second);
-
-                    if (o.third == "")
-                    {
-                        return (first * 60) + second;
-                    }
-                    else
-                    {
-                        return (first * 3600) + (second * 60) + int.Parse(o.third.Substring(1));
-                    }
+            var asTime = fields.
+                Select(o => new
+                {
+                    from = toInt(o.first1, o.second1, o.third1),
+                    to = toInt(o.first2, o.second2, o.third2),
+                    o.name,
                 }).
-                ToArray();
-
-            var sets = Enumerable.Range(0, asTime.Length / 2).
-                Select(o => (asTime[o * 2], asTime[o * 2 + 1])).
                 ToArray();
 
             // Validate backward (4:15 3:05)
-            var backward = Enumerable.Range(0, sets.Length).
+            var backward = Enumerable.Range(0, fields.Length).
                 Select(o => new
                 {
-                    match1 = matches[o * 2],
-                    match2 = matches[o * 2 + 1],
-                    time = sets[o],
+                    line = lines[o],
+                    asTime[o].from,
+                    asTime[o].to,
                 }).
-                Where(o => o.time.Item1 >= o.time.Item2).
-                Select(o => $"{o.match1} {o.match2}").
+                Where(o => o.from >= o.to).
                 ToArray();
 
             if (backward.Length > 0)
             {
-                return (string.Format("From time must be less than to time ({0})", string.Join(", ", backward)), null);
+                return (string.Format("From time must be less than to time ({0})", string.Join("\r\n", backward.Select(o => o.line))), null);
             }
 
             // Validate intersecting pairs (1:00 2:00, :30 2:30)
             var intersections = new List<(int, int)>();
-            for (int outer = 0; outer < sets.Length; outer++)
+            for (int outer = 0; outer < asTime.Length; outer++)
             {
-                for (int inner = 0; inner < sets.Length; inner++)
+                for (int inner = 0; inner < asTime.Length; inner++)
                 {
                     if (outer == inner)
                         continue;
 
-                    if (sets[outer].Item1 >= sets[inner].Item1 && sets[outer].Item1 <= sets[inner].Item2)
+                    if (asTime[outer].from >= asTime[inner].from && asTime[outer].from <= asTime[inner].to)
                         intersections.Add((outer, inner));
-                    else if (sets[outer].Item2 >= sets[inner].Item1 && sets[outer].Item2 <= sets[inner].Item2)
+                    else if (asTime[outer].to >= asTime[inner].from && asTime[outer].to <= asTime[inner].to)
                         intersections.Add((outer, inner));
                 }
             }
@@ -946,65 +955,53 @@ namespace ExtractImagesFromVideo
             if (intersections.Count > 0)
             {
                 string[] descriptions = intersections.
-                    Select(o => $"{matches[o.Item1 * 2]} {matches[o.Item1 * 2 + 1]} - {matches[o.Item2 * 2]} {matches[o.Item2 * 2 + 1]}").
+                    Select(o => $"{lines[o.Item1]} - {lines[o.Item2]}").
                     ToArray();
 
                 return (string.Format("Time windows straddle each other ({0})", string.Join("|", descriptions)), null);
             }
 
-            return (null, sets);
+            return
+            (
+                null,
+                asTime.
+                    Select(o => (o.from, o.to, o.name)).
+                    ToArray()
+            );
         }
 
-        private static string GetUnmatchedStringPortion(string text, List<Match> matches)
+        private static string[] CreateImageSnapshotSubfolders(string[] parentFolders, (int start, int stop, string name)[] windows)
         {
-            StringBuilder retVal = new StringBuilder();
-
-            int index = 0;
-
-            foreach (Match match in matches)
+            if(windows.Length == 0)
             {
-                if (match.Index > index)
-                {
-                    retVal.Append(text.Substring(index, match.Index - index));
-                }
-
-                index = match.Index + match.Length;
-            }
-
-            if (index < text.Length)
-            {
-                retVal.Append(text.Substring(index));
-            }
-
-            return retVal.ToString();
-        }
-
-        private static string[] CreateImageSnapshotSubfolders(string parentFolder, int count, string videoName)
-        {
-            // If the video was downloaded by this tool, it will have a digit in front.  Don't include that in the sub
-            // folders, because it's just annoying
-            Match startsWithNum = Regex.Match(videoName, @"^(?<remove>\d+ - ).");
-            if (startsWithNum.Success)
-            {
-                videoName = videoName.Substring(startsWithNum.Groups["remove"].Length);
+                windows = new (int start, int stop, string name)[] { (0, 0, "full video") };
             }
 
             // Use a counter to make sure folders are unique (especially useful if they hit extract button multiple times)
-            int startCount = Directory.GetDirectories(parentFolder).Length;
+            int startCount = parentFolders.Max(o => Directory.GetDirectories(o).Length);
             startCount++;
 
-            string subName = System.IO.Path.GetFileNameWithoutExtension(videoName);
-
-            string[] retVal = Enumerable.Range(0, count).
-                Select(o => System.IO.Path.Combine(parentFolder, $"{startCount + o} - {subName}")).
+            string[] names = windows.
+                Select((o, i) => $"{startCount + i} - {o.name}").
                 ToArray();
 
-            foreach (string childFolder in retVal)
+            // This will hold the full path of each item in names, but only for the first directory in parentFolders (which needs to be the images folder)
+            var retVal = new List<string>();
+
+            for (int cntr = 0; cntr < parentFolders.Length; cntr++)
             {
-                Directory.CreateDirectory(childFolder);
+                foreach (string name in names)
+                {
+                    string finalName = System.IO.Path.Combine(parentFolders[cntr], name);
+
+                    if (cntr == 0)
+                        retVal.Add(finalName);
+
+                    Directory.CreateDirectory(finalName);
+                }
             }
 
-            return retVal;
+            return retVal.ToArray();
         }
 
         #endregion
@@ -1035,6 +1032,134 @@ namespace ExtractImagesFromVideo
             }
 
             return (Color)ColorConverter.ConvertFromString(final);
+        }
+
+        /// <summary>
+        /// This will replace invalid chars with underscores, there are also some reserved words that it adds underscore to
+        /// </summary>
+        /// <remarks>
+        /// https://stackoverflow.com/questions/1976007/what-characters-are-forbidden-in-windows-and-linux-directory-names
+        /// </remarks>
+        /// <param name="containsFolder">Pass in true if filename represents a folder\file (passing true will allow slash)</param>
+        private static string EscapeFilename_Windows(string filename, bool containsFolder = false)
+        {
+            StringBuilder builder = new StringBuilder(filename.Length + 12);
+
+            int index = 0;
+
+            // Allow colon if it's part of the drive letter
+            if (containsFolder)
+            {
+                Match match = Regex.Match(filename, @"^\s*[A-Z]:\\", RegexOptions.IgnoreCase);
+                if (match.Success)
+                {
+                    builder.Append(match.Value);
+                    index = match.Length;
+                }
+            }
+
+            // Character substitutions
+            for (int cntr = index; cntr < filename.Length; cntr++)
+            {
+                char c = filename[cntr];
+
+                switch (c)
+                {
+                    case '\u0000':
+                    case '\u0001':
+                    case '\u0002':
+                    case '\u0003':
+                    case '\u0004':
+                    case '\u0005':
+                    case '\u0006':
+                    case '\u0007':
+                    case '\u0008':
+                    case '\u0009':
+                    case '\u000A':
+                    case '\u000B':
+                    case '\u000C':
+                    case '\u000D':
+                    case '\u000E':
+                    case '\u000F':
+                    case '\u0010':
+                    case '\u0011':
+                    case '\u0012':
+                    case '\u0013':
+                    case '\u0014':
+                    case '\u0015':
+                    case '\u0016':
+                    case '\u0017':
+                    case '\u0018':
+                    case '\u0019':
+                    case '\u001A':
+                    case '\u001B':
+                    case '\u001C':
+                    case '\u001D':
+                    case '\u001E':
+                    case '\u001F':
+
+                    case '<':
+                    case '>':
+                    case ':':
+                    case '"':
+                    case '/':
+                    case '|':
+                    case '?':
+                    case '*':
+                        builder.Append('_');
+                        break;
+
+                    case '\\':
+                        builder.Append(containsFolder ? c : '_');
+                        break;
+
+                    default:
+                        builder.Append(c);
+                        break;
+                }
+            }
+
+            string built = builder.ToString();
+
+            if (built == "")
+            {
+                return "_";
+            }
+
+            if (built.EndsWith(" ") || built.EndsWith("."))
+            {
+                built = built.Substring(0, built.Length - 1) + "_";
+            }
+
+            // These are reserved names, in either the folder or file name, but they are fine if following a dot
+            // CON, PRN, AUX, NUL, COM0 .. COM9, LPT0 .. LPT9
+            builder = new StringBuilder(built.Length + 12);
+            index = 0;
+            foreach (Match match in Regex.Matches(built, @"(^|\\)\s*(?<bad>CON|PRN|AUX|NUL|COM\d|LPT\d)\s*(\.|\\|$)", RegexOptions.IgnoreCase))
+            {
+                Group group = match.Groups["bad"];
+                if (group.Index > index)
+                {
+                    builder.Append(built.Substring(index, match.Index - index + 1));
+                }
+
+                builder.Append(group.Value);
+                builder.Append("_");        // putting an underscore after this keyword is enough to make it acceptable
+
+                index = group.Index + group.Length;
+            }
+
+            if (index == 0)
+            {
+                return built;
+            }
+
+            if (index < built.Length - 1)
+            {
+                builder.Append(built.Substring(index));
+            }
+
+            return builder.ToString();
         }
 
         #endregion

@@ -12,9 +12,8 @@ namespace ExtractImagesFromVideo
     {
         private const string FOLDER_VIDEO = "1 - Video";
         private const string FOLDER_IMAGES = "2 - Images";
-        // 3 - Final Images?        this gets messy because there could be multiple sets of images, each becoming a separate meshroom object
-        // 4 - Meshroom
-        // 5 - Post Meshroom (blender, other smoothing apps)
+        private const string FOLDER_MESHROOM = "3 - Meshroom";
+        private const string FOLDER_BLENDER = "4 - Blender";
 
         //TODO: Escape the characters
         public void Reset(string baseFolder, string session)
@@ -25,6 +24,8 @@ namespace ExtractImagesFromVideo
             SessionFolder = "";
             VideoFolder = "";
             ImagesFolder = "";
+            MeshroomFolder = "";
+            BlenderFolder = "";
 
             IsValid_Base = true;
             IsValid_Session = true;
@@ -45,6 +46,8 @@ namespace ExtractImagesFromVideo
             SessionFolder = System.IO.Path.Combine(BaseFolder, SessionName);
             VideoFolder = System.IO.Path.Combine(SessionFolder, FOLDER_VIDEO);
             ImagesFolder = System.IO.Path.Combine(SessionFolder, FOLDER_IMAGES);
+            MeshroomFolder = System.IO.Path.Combine(SessionFolder, FOLDER_MESHROOM); ;
+            BlenderFolder = System.IO.Path.Combine(SessionFolder, FOLDER_BLENDER); ;
         }
 
         public void EnsureFoldersExist()
@@ -78,6 +81,12 @@ namespace ExtractImagesFromVideo
                 step = "images";
                 Directory.CreateDirectory(ImagesFolder);
 
+                step = "meshroom";
+                Directory.CreateDirectory(MeshroomFolder);
+
+                step = "blender";
+                Directory.CreateDirectory(BlenderFolder);
+
                 DoFoldersExist = true;
             }
             catch (Exception ex)
@@ -99,6 +108,8 @@ namespace ExtractImagesFromVideo
         public string SessionFolder { get; private set; }
         public string VideoFolder { get; private set; }
         public string ImagesFolder { get; private set; }
+        public string MeshroomFolder { get; private set; }
+        public string BlenderFolder { get; private set; }
 
         public string SessionName { get; private set; }
     }
